@@ -1,0 +1,11 @@
+custom
+custom.bak
+botenv
+*.pyc
+stdout
+stdout2
+textgame
+bot_key
+bot_settings
+sessions
+
