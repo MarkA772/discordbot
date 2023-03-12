@@ -95,14 +95,15 @@ Chat Commands:
         -- mudstop: Stops the MUD session in the current room.
 
         -- md (command): Send command to TinyFugue in the current room
-            session. See examples:
+            session. Send multiple commands at once with a newline
+            between them (hold shift and press enter in discord). Has no
+            effect if not connected to a MUD. See examples:
             '%md /help': This will send '/help' to TinyFugue, which will
                 give general tinyfugue client help.
             '%md /connect discworld.starturtle.net 4242': Connect to the
                 discworld MUD.
             '%md look at cabbage': Send the command 'look at cabbage' to
-                the connected MUD. Has no effect if not connected to a
-                MUD.
+                the connected MUD.
 
         -- / (command): Slightly shorter alias to the 'md' command.
 
@@ -216,6 +217,9 @@ TODO:
     Possibly improve telnet output, truncate large output files,
     or move away from using files entirely. If keeping the same
     output system, automatically create the folder for the files.
+
+    Add functionality for sending multiple commands at once. Newline
+    possibly.
 
 Bugs:
     Occasionally I have seen an ioctl error, probably related to the
@@ -499,10 +503,12 @@ class BotApp(discord.Client):
     async def send_mud_command(self, message_data):
         session = self.game_sessions.get(message_data.channel.id)
         if session:
-            line = " ".join(message_data.content.split(" ")[1:]) + "\n"
-            session['sp'].stdin.write(line.encode("utf-8"))
-            session['sp'].stdin.flush()
-            await asyncio.sleep(0.2)
+            lines = " ".join(message_data.content.split(" ")[1:]).split("\n")
+            for line in lines:
+                line = line + "\n"
+                session['sp'].stdin.write(line.encode("utf-8"))
+                session['sp'].stdin.flush()
+                await asyncio.sleep(0.2)
             await self.send_mud_output(session)
         else:
             await message_data.channel.send("No session found for this channel.")
@@ -512,7 +518,10 @@ class BotApp(discord.Client):
         while True:
             if session['sp'].poll() is not None:
                 break
-            line = session['stdout2'].readline()
+            try:
+                line = session['stdout2'].readline()
+            except ValueError:
+                break
             if line:
                 ioctl_error = '% TIOCGWINSZ ioctl: Inappropriate ioctl for device'
                 if ioctl_error not in line:
