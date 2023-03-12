@@ -232,6 +232,7 @@ Bugs:
 import asyncio
 import json
 import os
+import openai
 import random
 import re
 import subprocess
@@ -240,14 +241,16 @@ import queue
 import discord
 
 srand = random.SystemRandom()
-
 script_path = os.path.dirname(os.path.abspath(__file__))
+with open(os.path.join(script_path, "bot_key")) as f:
+    my_key = f.readline().replace("\n", "")
+    openai.api_key = f.readline().replace("\n", "")
 
 tiny_fugue_path = "tf"
 
 class BotApp(discord.Client):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, intents):
+        super().__init__(intents=intents)
         self.mycmds = self.init_commands()
         self.restricted = self.init_restricted()
         self.game_sessions = {}
@@ -259,6 +262,9 @@ class BotApp(discord.Client):
         print(self.user.id)
 
     async def on_message(self, message_data):
+        if not message_data.guild: # If it's a DM
+            await self.send_ai_response(message_data)
+            return
         perms = self.bot_settings['permissions'].get(str(message_data.guild.id))
         if perms and perms.get('blacklist'):
             for role in message_data.author.roles:
@@ -271,6 +277,20 @@ class BotApp(discord.Client):
         if len(message_data.content.strip()) == 0:
             return
         await self.parse_cmd(message_data)
+
+    async def send_ai_response(self, message):
+        if message.author.id == 247183309061226496:
+            return
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are Principal Skinner during the steamed hams episode."},
+                {"role": "user", "content": "From now on, answer as Principal Skinner."},
+                {"role": "user", "content": message.content},
+            ]
+        )
+
+        await message.channel.send(response.choices[0].message.content)
 
     async def bot_say(self, message_data):
         rm = message_data.channel
@@ -777,10 +797,9 @@ class BotApp(discord.Client):
 
 
 if __name__ == "__main__":
-    with open(os.path.join(script_path, "bot_key")) as f:
-        my_key = f.readline().replace("\n", "")
-    bot_app = BotApp()
-    bot_app.loop.create_task(bot_app.check_muds())
+    intents = discord.Intents(members=True, messages=True, message_content=True)
+    bot_app = BotApp(intents)
+    # bot_app.loop.create_task(bot_app.check_muds()) ### Need to update this for discordpy 2
     bot_app.run(my_key)
     print("Finished processes, exiting.")
 
