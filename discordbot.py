@@ -257,6 +257,7 @@ class BotApp(discord.Client):
         self.bot_settings = self.load_settings()
         if not self.bot_settings:
             self.bot_settings = self.create_default_settings()
+        self.my_messages = []
         
     async def on_ready(self):
         print(self.user.id)
@@ -281,6 +282,21 @@ class BotApp(discord.Client):
     async def send_ai_response(self, message):
         if message.author.id == 247183309061226496:
             return
+
+        if message.author.id == 205338978482782208:
+            if message.content == "reset":
+                self.my_messages = []
+                return
+            self.my_messages.append({"role": "user", "content": message.content})
+            try:
+                response = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=self.my_messages, temperature=0.2)
+            except Exception as e:
+                await message.channel.send("OpenAI error: " + str(e))
+                return
+            self.my_messages.append({"role":"assistant", "content": response.choices[0].message.content})
+            await message.channel.send(response.choices[0].message.content)
+            return
+
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[
@@ -797,7 +813,7 @@ class BotApp(discord.Client):
 
 
 if __name__ == "__main__":
-    intents = discord.Intents(members=True, messages=True, message_content=True)
+    intents = discord.Intents(members=True, messages=True, message_content=True, emojis=True, guilds=True)
     bot_app = BotApp(intents)
     # bot_app.loop.create_task(bot_app.check_muds()) ### Need to update this for discordpy 2
     bot_app.run(my_key)
