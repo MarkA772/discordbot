@@ -299,8 +299,6 @@ class BotApp(discord.Client):
             )
             await message.channel.send(response["output"]["message"]["content"][0]["text"])
 
-        await message.channel.send("I'm sorry, I can't respond to DMs at this time.")
-
     async def bot_say(self, message_data):
         rm = message_data.channel
         full_text = message_data.content
