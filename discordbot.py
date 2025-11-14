@@ -232,7 +232,7 @@ Bugs:
 import asyncio
 import json
 import os
-import openai
+import boto3
 import random
 import re
 import subprocess
@@ -244,7 +244,8 @@ srand = random.SystemRandom()
 script_path = os.path.dirname(os.path.abspath(__file__))
 with open(os.path.join(script_path, "bot_key")) as f:
     my_key = f.readline().replace("\n", "")
-    openai.api_key = f.readline().replace("\n", "")
+    ai_access_id = f.readline().replace("\n", "")
+    ai_access_key = f.readline().replace("\n", "")
 
 tiny_fugue_path = "tf"
 
@@ -280,33 +281,25 @@ class BotApp(discord.Client):
         await self.parse_cmd(message_data)
 
     async def send_ai_response(self, message):
-        if message.author.id == 247183309061226496:
-            return
-
-        if message.author.id == 205338978482782208:
-            if message.content == "reset":
-                self.my_messages = []
-                return
-            self.my_messages.append({"role": "user", "content": message.content})
-            try:
-                response = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=self.my_messages, temperature=0.2)
-            except Exception as e:
-                await message.channel.send("OpenAI error: " + str(e))
-                return
-            self.my_messages.append({"role":"assistant", "content": response.choices[0].message.content})
-            await message.channel.send(response.choices[0].message.content)
-            return
-
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "You are Principal Skinner during the steamed hams episode."},
-                {"role": "user", "content": "From now on, answer as Principal Skinner."},
-                {"role": "user", "content": message.content},
-            ]
+        client = boto3.client('bedrock-runtime',
+            aws_access_key_id=ai_access_id,
+            aws_secret_access_key=ai_access_key,
+            region_name='us-east-1',
         )
+        if message.author.id == 205338978482782208:
+            response = client.converse(
+                modelId = 'anthropic.claude-3-haiku-20240307-v1:0',
+                inferenceConfig = {"maxTokens": 512, "temperature": 0.5, "topP": 0.9},
+                messages = [
+                    {
+                        'role': "user",
+                        'content': [{ 'text': message.content }],
+                    },
+                ],
+            )
+            await message.channel.send(response["output"]["message"]["content"][0]["text"])
 
-        await message.channel.send(response.choices[0].message.content)
+        await message.channel.send("I'm sorry, I can't respond to DMs at this time.")
 
     async def bot_say(self, message_data):
         rm = message_data.channel
